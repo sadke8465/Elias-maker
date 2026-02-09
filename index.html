@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hebrew Cards Downloader</title>
+    <title>Hebrew Cards Fixed</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         body {
@@ -27,12 +27,12 @@
             box-sizing: border-box;
             border: 1px solid #ccc;
             border-radius: 8px;
-            font-size: 16px; /* Prevents zoom on focus */
+            font-size: 16px;
             text-align: right;
             margin-bottom: 20px;
         }
         button {
-            background-color: #2f855a; /* Green */
+            background-color: #007bff; /* Blue */
             color: white;
             border: none;
             padding: 15px 30px;
@@ -52,7 +52,7 @@
 <body>
 
     <div class="container">
-        <h2>מחולל כרטיסים (הורדה)</h2>
+        <h2>מחולל כרטיסים (תיקון היפוך)</h2>
         <p style="font-size: 0.9em; color: #666;">
             Make sure <strong>GoogleSans_17pt-Medium.ttf</strong> is in the same folder.
         </p>
@@ -73,6 +73,13 @@
             return window.btoa(binary);
         }
 
+        // Helper: Manually reverse text for visual RTL
+        // "1. שלום" -> becomes -> "םולש .1"
+        // This tricks the LTR PDF engine into drawing Hebrew correctly.
+        function reverseString(str) {
+            return str.split("").reverse().join("");
+        }
+
         async function generateRealPDF() {
             const input = document.getElementById('wordInput').value;
             const statusDiv = document.getElementById('status');
@@ -88,10 +95,9 @@
 
                 // --- FONT LOADING ---
                 const fontFilename = 'GoogleSans_17pt-Medium.ttf';
-                
                 try {
                     const response = await fetch(fontFilename);
-                    if (!response.ok) throw new Error("404: Font file not found");
+                    if (!response.ok) throw new Error("Font file not found");
                     const buffer = await response.arrayBuffer();
                     const fontBase64 = arrayBufferToBase64(buffer);
 
@@ -99,8 +105,8 @@
                     doc.addFont(fontFilename, 'CustomFont', 'normal');
                     doc.setFont('CustomFont');
                 } catch (fontError) {
-                    statusDiv.innerText = "Error: Font not found on server.";
-                    alert("Could not load 'GoogleSans_17pt-Medium.ttf'. Ensure it is uploaded to GitHub.");
+                    statusDiv.innerText = "Error: Font not found.";
+                    alert("Could not load 'GoogleSans_17pt-Medium.ttf'.\nPlease upload it to the same folder as this HTML file.");
                     return;
                 }
 
@@ -117,7 +123,7 @@
                 const cardWidth = printableWidth / cols;
                 const cardHeight = printableHeight / rows;
 
-                // --- SHUFFLE & GROUP ---
+                // --- SHUFFLE ---
                 for (let i = words.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [words[i], words[j]] = [words[j], words[i]];
@@ -146,7 +152,9 @@
                         const colIdx = cardIdx % cols; 
                         const rowIdx = Math.floor(cardIdx / cols);
 
-                        // RTL Logic: Col 0 is visually Right
+                        // RTL Layout Logic
+                        // Even though we reverse text, we still need to calculate the BOX position correctly
+                        // col 0 is Right, col 1 is Left
                         const xPos = margin + ((cols - 1 - colIdx) * cardWidth);
                         const yPos = margin + (rowIdx * cardHeight);
 
@@ -155,26 +163,32 @@
                         doc.setFontSize(14);
                         doc.setTextColor(0);
 
+                        // Align text to the RIGHT edge of the card
                         const textRightEdge = xPos + cardWidth - 10;
                         const textTopStart = yPos + 25; 
                         const lineHeight = 9;
 
                         cardWords.forEach((word, wIdx) => {
-                            const textLine = `${wIdx + 1}. ${word}`;
-                            doc.text(textLine, textRightEdge, textTopStart + (wIdx * lineHeight), { 
-                                align: 'right', 
-                                rtl: true 
+                            // 1. Create the string "1. Word"
+                            let fullString = `${wIdx + 1}. ${word}`;
+                            
+                            // 2. Reverse the ENTIRE string for the fix
+                            // "1. שלום" becomes "םולש .1"
+                            let reversedString = reverseString(fullString);
+
+                            // 3. Draw it ALIGNED RIGHT, but turn OFF the 'rtl' flag
+                            // We are manually feeding it visual RTL, so we tell the PDF it's standard text.
+                            doc.text(reversedString, textRightEdge, textTopStart + (wIdx * lineHeight), { 
+                                align: 'right',
+                                rtl: false  // Important: We handled RTL ourselves
                             });
                         });
                     });
                 });
 
                 statusDiv.innerText = "Downloading...";
-                
-                // --- THE FIX: FORCE DOWNLOAD ---
-                doc.save('HebrewCards.pdf');
-                
-                statusDiv.innerText = "Check your 'Downloads' folder!";
+                doc.save('HebrewCards_Fixed.pdf');
+                statusDiv.innerText = "Done! Check your Downloads.";
 
             } catch (e) {
                 console.error(e);
