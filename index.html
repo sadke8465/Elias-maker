@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hebrew Cards PDF</title>
+    <title>Hebrew Cards Downloader</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         body {
-            font-family: sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background: #f0f2f5;
             padding: 20px;
             text-align: center;
@@ -27,12 +27,12 @@
             box-sizing: border-box;
             border: 1px solid #ccc;
             border-radius: 8px;
-            font-size: 16px;
+            font-size: 16px; /* Prevents zoom on focus */
             text-align: right;
             margin-bottom: 20px;
         }
         button {
-            background-color: #2f855a;
+            background-color: #2f855a; /* Green */
             color: white;
             border: none;
             padding: 15px 30px;
@@ -44,19 +44,20 @@
         }
         #status {
             margin-top: 15px;
-            color: #555;
-            font-size: 0.9em;
-            font-weight: bold;
+            color: #333;
+            font-weight: 500;
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>מחולל PDF (פונט מקומי)</h2>
-        <p>Ensure <strong>GoogleSans_17pt-Medium.ttf</strong> is in the same folder as this file.</p>
+        <h2>מחולל כרטיסים (הורדה)</h2>
+        <p style="font-size: 0.9em; color: #666;">
+            Make sure <strong>GoogleSans_17pt-Medium.ttf</strong> is in the same folder.
+        </p>
         <textarea id="wordInput" placeholder="הדבק מילים כאן..."></textarea>
-        <button onclick="generateRealPDF()">Generate PDF</button>
+        <button onclick="generateRealPDF()">Download PDF</button>
         <div id="status"></div>
     </div>
 
@@ -83,51 +84,45 @@
 
             try {
                 const { jsPDF } = window.jspdf;
-                // A4 Portrait
                 const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
 
-                // --- FONT LOADING SECTION ---
-                // We use the exact filename you provided
+                // --- FONT LOADING ---
                 const fontFilename = 'GoogleSans_17pt-Medium.ttf';
                 
                 try {
                     const response = await fetch(fontFilename);
-                    if (!response.ok) throw new Error("Could not find font file.");
+                    if (!response.ok) throw new Error("404: Font file not found");
                     const buffer = await response.arrayBuffer();
                     const fontBase64 = arrayBufferToBase64(buffer);
 
-                    // Add font to PDF
                     doc.addFileToVFS(fontFilename, fontBase64);
-                    doc.addFont(fontFilename, 'MyHebrewFont', 'normal');
-                    doc.setFont('MyHebrewFont');
+                    doc.addFont(fontFilename, 'CustomFont', 'normal');
+                    doc.setFont('CustomFont');
                 } catch (fontError) {
-                    alert("Error loading font: " + fontFilename + "\nMake sure the file is in the root folder.");
-                    statusDiv.innerText = "Font load failed.";
+                    statusDiv.innerText = "Error: Font not found on server.";
+                    alert("Could not load 'GoogleSans_17pt-Medium.ttf'. Ensure it is uploaded to GitHub.");
                     return;
                 }
 
-                // --- PDF LAYOUT CALCULATIONS ---
+                // --- CONFIGURATION ---
                 const margin = 10; 
                 const pageWidth = 210;
                 const pageHeight = 297;
-                
-                // 2 Cols x 4 Rows
                 const cols = 2;
                 const rows = 4;
                 
                 const printableWidth = pageWidth - (margin * 2);
                 const printableHeight = pageHeight - (margin * 2);
                 
-                const cardWidth = printableWidth / cols;   // ~95mm
-                const cardHeight = printableHeight / rows; // ~69mm
+                const cardWidth = printableWidth / cols;
+                const cardHeight = printableHeight / rows;
 
-                // Shuffle
+                // --- SHUFFLE & GROUP ---
                 for (let i = words.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [words[i], words[j]] = [words[j], words[i]];
                 }
 
-                // Chunking
                 const wordsPerCard = 4;
                 const cardsPerPage = cols * rows;
                 let cards = [];
@@ -143,32 +138,25 @@
                 pages.forEach((pageCards, pageIdx) => {
                     if (pageIdx > 0) doc.addPage();
                     
-                    // Set styles
                     doc.setLineWidth(0.1); 
-                    doc.setDrawColor(100); // Dark Gray lines
-                    doc.setLineDashPattern([3, 3], 0); // Dashed lines for cutting
+                    doc.setDrawColor(100); 
+                    doc.setLineDashPattern([3, 3], 0); 
 
                     pageCards.forEach((cardWords, cardIdx) => {
-                        // Calculate position
                         const colIdx = cardIdx % cols; 
                         const rowIdx = Math.floor(cardIdx / cols);
 
-                        // RTL Logic for Columns: Col 0 is visually on the Right
-                        // xPos is the top-left corner of the cell
+                        // RTL Logic: Col 0 is visually Right
                         const xPos = margin + ((cols - 1 - colIdx) * cardWidth);
                         const yPos = margin + (rowIdx * cardHeight);
 
-                        // Draw Border
                         doc.rect(xPos, yPos, cardWidth, cardHeight);
 
-                        // Text Settings
                         doc.setFontSize(14);
                         doc.setTextColor(0);
 
-                        // Text alignment
-                        // We align RIGHT. The X coordinate for right-alignment is (xPos + cardWidth - padding)
                         const textRightEdge = xPos + cardWidth - 10;
-                        const textTopStart = yPos + 25; // 25mm from top of card
+                        const textTopStart = yPos + 25; 
                         const lineHeight = 9;
 
                         cardWords.forEach((word, wIdx) => {
@@ -181,14 +169,16 @@
                     });
                 });
 
-                statusDiv.innerText = "Done! Opening...";
+                statusDiv.innerText = "Downloading...";
                 
-                // Open PDF in new window (forces iOS viewer)
-                doc.output('dataurlnewwindow');
+                // --- THE FIX: FORCE DOWNLOAD ---
+                doc.save('HebrewCards.pdf');
                 
+                statusDiv.innerText = "Check your 'Downloads' folder!";
+
             } catch (e) {
                 console.error(e);
-                alert("An error occurred: " + e.message);
+                statusDiv.innerText = "Error: " + e.message;
             }
         }
     </script>
