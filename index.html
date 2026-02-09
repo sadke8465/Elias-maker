@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>9-Card Grid (3x3)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- Screen Styling --- */
+        body {
+            font-family: 'Rubik', sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 15px;
+            color: #333;
+            text-align: center;
+        }
+
+        .no-print-container {
+            max-width: 600px;
+            margin: 0 auto 20px auto;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        textarea {
+            width: 100%;
+            height: 120px;
+            padding: 12px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+
+        button {
+            width: 100%;
+            background-color: #e53e3e; /* Red/Pink for visibility */
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        #output-area {
+            display: none;
+            overflow-x: auto;
+            padding-bottom: 20px;
+        }
+
+        /* --- A4 Portrait Sheet (3x3 Grid) --- */
+        .sheet {
+            background: white;
+            width: 210mm; 
+            height: 296mm; /* Full A4 Height */
+            padding: 0;
+            margin: 0 auto 30px auto;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            
+            /* Grid: 3 Columns x 3 Rows */
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 0; /* Cards touch */
+            page-break-after: always;
+        }
+
+        /* --- Card Styling --- */
+        .card {
+            --cut-line: 1px dashed #aaa;
+            
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center; 
+            text-align: center;
+            padding: 10px;
+            
+            font-size: 13pt; 
+            line-height: 1.5;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* --- 3x3 Border Logic --- */
+        /* Add Right Border to Columns 1 and 2 (Not 3) */
+        .card:not(:nth-child(3n)) {
+            border-right: var(--cut-line);
+        }
+
+        /* Add Bottom Border to Rows 1 and 2 (Items 1-6) */
+        .card:nth-child(-n+6) {
+            border-bottom: var(--cut-line);
+        }
+
+        .word-item { margin-bottom: 6px; width: 100%; }
+        .number { font-weight: bold; color: #666; margin-left: 4px; }
+
+        /* --- Print Settings --- */
+        @media print {
+            @page {
+                size: A4 portrait; 
+                margin: 0;
+            }
+            body { margin: 0; background: white; }
+            .no-print-container { display: none; }
+            #output-area { display: block; }
+            .sheet {
+                box-shadow: none;
+                margin: 0;
+                width: 210mm;
+                height: 297mm;
+            }
+            .card { --cut-line: 1px dashed #444; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="no-print-container">
+        <h2>מחולל כרטיסים (3x3)</h2>
+        <p>פריסה של 9 כרטיסים בדף (3 טורים, 3 שורות).<br>מנצל את כל הדף ללא שוליים.</p>
+        <textarea id="wordInput" placeholder="הדבק מילים כאן..."></textarea>
+        <button onclick="generateAndPrint()">צור 9 כרטיסים לדף</button>
+    </div>
+
+    <div id="output-area"></div>
+
+    <script>
+        function generateAndPrint() {
+            const input = document.getElementById('wordInput').value;
+            const outputArea = document.getElementById('output-area');
+            
+            let words = input.split('\n').map(w => w.trim()).filter(w => w.length > 0);
+            if (words.length === 0) { alert("נא להזין מילים"); return; }
+
+            // Shuffle
+            for (let i = words.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [words[i], words[j]] = [words[j], words[i]];
+            }
+
+            outputArea.innerHTML = '';
+            outputArea.style.display = 'block';
+
+            const wordsPerCard = 4;
+            const cardsPerPage = 9; // UPDATED to 9
+            
+            // Logic
+            let cards = [];
+            for (let i = 0; i < words.length; i += wordsPerCard) {
+                cards.push(words.slice(i, i + wordsPerCard));
+            }
+
+            // Fill last card logic
+            let lastCard = cards[cards.length-1];
+            while(lastCard.length < wordsPerCard) lastCard.push("");
+
+            // Page Grouping
+            let pages = [];
+            for (let i = 0; i < cards.length; i += cardsPerPage) {
+                pages.push(cards.slice(i, i + cardsPerPage));
+            }
+
+            // Render
+            pages.forEach(pageCards => {
+                const sheetDiv = document.createElement('div');
+                sheetDiv.className = 'sheet';
+
+                pageCards.forEach(cardWords => {
+                    const cardDiv = document.createElement('div');
+                    cardDiv.className = 'card';
+                    
+                    let htmlContent = '';
+                    cardWords.forEach((word, index) => {
+                        const content = word ? `<span class="number">${index + 1}.</span> ${word}` : "&nbsp;";
+                        htmlContent += `<div class="word-item">${content}</div>`;
+                    });
+                    cardDiv.innerHTML = htmlContent;
+                    sheetDiv.appendChild(cardDiv);
+                });
+
+                // Fill empty page slots to keep grid perfect
+                while(sheetDiv.children.length < cardsPerPage) {
+                    const empty = document.createElement('div');
+                    empty.className = 'card';
+                    empty.innerHTML = '&nbsp;';
+                    sheetDiv.appendChild(empty);
+                }
+
+                outputArea.appendChild(sheetDiv);
+            });
+
+            setTimeout(() => window.print(), 500);
+        }
+    </script>
+</body>
+</html>
