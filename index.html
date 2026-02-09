@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hebrew Cards Fixed</title>
+    <title>מחולל אליאס + מילות מילוי</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         body {
@@ -11,6 +11,7 @@
             background: #f0f2f5;
             padding: 20px;
             text-align: center;
+            color: #333;
         }
         .container {
             background: white;
@@ -18,21 +19,66 @@
             border-radius: 12px;
             max-width: 600px;
             margin: auto;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
+        h1 { color: #553c9a; margin-bottom: 10px; margin-top: 0; }
+        
+        /* --- Stats Bar --- */
+        .stats-bar {
+            display: flex;
+            justify-content: space-around;
+            background-color: #f0ebf8;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #d6bcfa;
+        }
+        .stat-item { display: flex; flex-direction: column; align-items: center; }
+        .stat-value { font-size: 1.2rem; font-weight: bold; color: #553c9a; }
+        .stat-label { font-size: 0.8rem; color: #666; }
+
+        /* --- Slider Control --- */
+        .slider-container {
+            background: #fafafa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px dashed #ccc;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .slider-label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 10px;
+            color: #444;
+        }
+        input[type=range] {
+            width: 100%;
+            margin: 10px 0;
+            accent-color: #553c9a;
+        }
+        .slider-val-display {
+            font-size: 1.1em;
+            color: #553c9a;
+            font-weight: bold;
+        }
+
         textarea {
             width: 100%;
-            height: 150px;
-            padding: 10px;
+            height: 120px;
+            padding: 12px;
             box-sizing: border-box;
-            border: 1px solid #ccc;
+            border: 2px solid #ddd;
             border-radius: 8px;
             font-size: 16px;
             text-align: right;
             margin-bottom: 20px;
+            font-family: inherit;
         }
+        textarea:focus { border-color: #553c9a; outline: none; }
+        
         button {
-            background-color: #007bff; /* Blue */
+            background-color: #553c9a;
             color: white;
             border: none;
             padding: 15px 30px;
@@ -41,59 +87,171 @@
             cursor: pointer;
             width: 100%;
             font-weight: bold;
+            transition: background 0.2s;
         }
-        #status {
-            margin-top: 15px;
-            color: #333;
-            font-weight: 500;
-        }
+        button:hover { background-color: #44307b; }
+        #status { margin-top: 15px; font-weight: bold; color: #555; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>מחולל כרטיסים (תיקון היפוך)</h2>
-        <p style="font-size: 0.9em; color: #666;">
-            Make sure <strong>GoogleSans_17pt-Medium.ttf</strong> is in the same folder.
-        </p>
-        <textarea id="wordInput" placeholder="הדבק מילים כאן..."></textarea>
-        <button onclick="generateRealPDF()">Download PDF</button>
+        <h1>מחולל אליאס</h1>
+        
+        <div class="stats-bar">
+            <div class="stat-item">
+                <span class="stat-value" id="finalWordCount">0</span>
+                <span class="stat-label">סה"כ מילים</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" id="cardCount">0</span>
+                <span class="stat-label">כרטיסים</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" id="pageCount">0</span>
+                <span class="stat-label">עמודים</span>
+            </div>
+        </div>
+
+        <div class="slider-container">
+            <label class="slider-label">יעד מילים סופי (כולל מילוי): <span id="sliderValue" class="slider-val-display">0</span></label>
+            <input type="range" id="wordGoalSlider" min="0" max="200" value="0" oninput="updateStats()">
+            <div style="font-size: 0.8em; color: #888; margin-top:5px;">
+                (מינימום: המילים שהקלדת | מקסימום: 200)
+            </div>
+        </div>
+
+        <textarea id="wordInput" placeholder="הדבק את המילים שלך כאן..." oninput="handleInput()"></textarea>
+        
+        <button onclick="generateRealPDF()">הורד קובץ PDF</button>
         <div id="status"></div>
     </div>
 
     <script>
-        // Helper: Convert binary font data to Base64
+        /* ================================================================
+           --- מאגר המילים החדש שלך --- 
+           ================================================================
+        */
+        const FILLER_POOL = [
+            "שמש", "מטרייה", "גלידה", "רכבת", "חלון", "מפתח", "כדור", "מחברת", "עוגה", "שולחן",
+            "כיסא", "טלפון", "שעון", "ים", "הר", "נהר", "ענן", "פרח", "עץ", "דשא",
+            "כלב", "חתול", "ציפור", "דג", "סוס", "אוטובוס", "מכונית", "אופניים", "מטוס", "סירה",
+            "כובע", "חולצה", "נעליים", "גרביים", "מעיל", "תיק", "משקפיים", "טבעת", "שרשרת", "שעון יד",
+            "מטבח", "סלון", "חדר", "מיטה", "כרית", "שמיכה", "מראה", "מנורה", "דלת", "מדרגות",
+            "בית", "רחוב", "גשר", "פארק", "חוף", "אי", "מדבר", "יער", "עיר", "כפר",
+            "ספר", "סיפור", "ציור", "מוזיקה", "שיר", "סרט", "תיאטרון", "ריקוד", "משחק", "חידה",
+            "מחשב", "מקלדת", "עכבר", "מסך", "מצלמה", "רמקול", "אוזניות", "סוללה", "אינטרנט", "אפליקציה",
+            "אוכל", "שתייה", "לחם", "גבינה", "פסטה", "אורז", "סלט", "מרק", "שוק", "בלון",
+            "מתנה", "מסיבה", "רעש", "שקט", "צחוק", "בכי", "חלום", "סיוט", "תקווה", "חופש",
+            "עבודה", "לימודים", "מבחן", "תשובה", "שאלה", "רעיון", "זיכרון", "הפתעה", "סוד", "מלך",
+            "מלכה", "נסיך", "נסיכה", "גיבור", "נבל", "קוסם", "דרקון", "חרב", "מגן", "גשם",
+            "שלג", "ברק", "רוח", "סערה", "קיץ", "חורף", "אביב", "סתיו", "טיפה", "מדינה",
+            "גבול", "מפה", "דגל", "שדה", "כביש", "רמזור", "תחנה", "נמל", "חבר", "חברה",
+            "משפחה", "אמא", "אבא", "אח", "אחות", "דוד", "דודה", "סבא", "סבתא", "ילד",
+            "ילדה", "תינוק", "מבוגר", "שכן", "מורה", "תלמיד", "רופא", "נהג", "מטבע", "כסף",
+            "ארנק", "קנייה", "מכירה", "חנות", "קבלה", "הנחה", "מחיר", "חשבון", "כדורגל", "כדורסל",
+            "טניס", "שחייה", "ריצה", "קפיצה", "שער", "קבוצה", "מאמן", "שופט", "בוקר", "צהריים",
+            "ערב", "לילה", "שבוע", "חודש", "שנה", "אתמול", "מחר", "עכשיו"
+        ];
+        
+        // --- Logic Start ---
+
+        // Get user words without duplicates
+        function getUserWords() {
+            const input = document.getElementById('wordInput').value;
+            return input.split('\n').map(w => w.trim()).filter(w => w.length > 0);
+        }
+
+        // Handle text typing: update slider min/max and stats
+        function handleInput() {
+            const userWords = [...new Set(getUserWords())]; // Unique user words
+            const slider = document.getElementById('wordGoalSlider');
+            
+            // Set slider minimum to at least the number of words user typed
+            const currentCount = userWords.length;
+            slider.min = currentCount;
+            
+            // If user typed more than current slider value, push slider up
+            if (parseInt(slider.value) < currentCount) {
+                slider.value = currentCount;
+            }
+            
+            updateStats();
+        }
+
+        // Calculate final list (User + Filler) and update UI
+        function getFinalList() {
+            const userWords = [...new Set(getUserWords())]; // Remove duplicates from user input
+            const sliderVal = parseInt(document.getElementById('wordGoalSlider').value);
+            
+            let finalList = [...userWords];
+            
+            // Calculate how many filler words are needed
+            const needed = sliderVal - finalList.length;
+            
+            if (needed > 0) {
+                // Filter the pool to exclude words the user already typed
+                const availableFillers = FILLER_POOL.filter(w => !finalList.includes(w));
+                
+                // Shuffle the available fillers
+                for (let i = availableFillers.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [availableFillers[i], availableFillers[j]] = [availableFillers[j], availableFillers[i]];
+                }
+                
+                // Take the needed amount (or as many as available if pool runs dry)
+                const fillersToAdd = availableFillers.slice(0, needed);
+                finalList = finalList.concat(fillersToAdd);
+            }
+            
+            return finalList;
+        }
+
+        function updateStats() {
+            const slider = document.getElementById('wordGoalSlider');
+            const display = document.getElementById('sliderValue');
+            
+            // Update slider number display
+            display.innerText = slider.value;
+
+            // Calculate stats based on the TARGET number (slider value)
+            const totalWords = parseInt(slider.value);
+            const totalCards = Math.ceil(totalWords / 4);
+            const totalPages = Math.ceil(totalCards / 9);
+
+            document.getElementById('finalWordCount').innerText = totalWords;
+            document.getElementById('cardCount').innerText = totalCards;
+            document.getElementById('pageCount').innerText = totalPages;
+        }
+
+        // --- PDF Generation ---
+        
         function arrayBufferToBase64(buffer) {
             let binary = '';
             const bytes = new Uint8Array(buffer);
             const len = bytes.byteLength;
-            for (let i = 0; i < len; i++) {
-                binary += String.fromCharCode(bytes[i]);
-            }
+            for (let i = 0; i < len; i++) { binary += String.fromCharCode(bytes[i]); }
             return window.btoa(binary);
         }
 
-        // Helper: Manually reverse text for visual RTL
-        // "1. שלום" -> becomes -> "םולש .1"
-        // This tricks the LTR PDF engine into drawing Hebrew correctly.
         function reverseString(str) {
             return str.split("").reverse().join("");
         }
 
         async function generateRealPDF() {
-            const input = document.getElementById('wordInput').value;
+            // 1. Get the final combined list
+            let words = getFinalList();
             const statusDiv = document.getElementById('status');
             
-            let words = input.split('\n').map(w => w.trim()).filter(w => w.length > 0);
-            if (words.length === 0) { alert("אנא הכנס מילים"); return; }
+            if (words.length === 0) { alert("אנא הכנס מילים או הזז את הסליידר."); return; }
 
-            statusDiv.innerText = "Generating PDF...";
+            statusDiv.innerText = "מכין את הקובץ...";
 
             try {
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
 
-                // --- FONT LOADING ---
+                // Load Font
                 const fontFilename = 'GoogleSans_17pt-Medium.ttf';
                 try {
                     const response = await fetch(fontFilename);
@@ -105,45 +263,45 @@
                     doc.addFont(fontFilename, 'CustomFont', 'normal');
                     doc.setFont('CustomFont');
                 } catch (fontError) {
-                    statusDiv.innerText = "Error: Font not found.";
-                    alert("Could not load 'GoogleSans_17pt-Medium.ttf'.\nPlease upload it to the same folder as this HTML file.");
+                    statusDiv.innerText = "שגיאה: קובץ הפונט חסר.";
+                    alert("לא ניתן לטעון את הפונט. ודא ש-GoogleSans_17pt-Medium.ttf קיים.");
                     return;
                 }
 
-                // --- CONFIGURATION ---
+                // Layout Config (3x3)
                 const margin = 10; 
                 const pageWidth = 210;
                 const pageHeight = 297;
-                const cols = 2;
-                const rows = 4;
-                
+                const cols = 3;
+                const rows = 3;
                 const printableWidth = pageWidth - (margin * 2);
                 const printableHeight = pageHeight - (margin * 2);
-                
                 const cardWidth = printableWidth / cols;
                 const cardHeight = printableHeight / rows;
 
-                // --- SHUFFLE ---
+                // 2. SHUFFLE EVERYTHING 
                 for (let i = words.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [words[i], words[j]] = [words[j], words[i]];
                 }
 
+                // Chunking
                 const wordsPerCard = 4;
-                const cardsPerPage = cols * rows;
+                const cardsPerPage = cols * rows; 
+                
                 let cards = [];
                 for (let i = 0; i < words.length; i += wordsPerCard) {
                     cards.push(words.slice(i, i + wordsPerCard));
                 }
+
                 let pages = [];
                 for (let i = 0; i < cards.length; i += cardsPerPage) {
                     pages.push(cards.slice(i, i + cardsPerPage));
                 }
 
-                // --- DRAWING ---
+                // Drawing
                 pages.forEach((pageCards, pageIdx) => {
                     if (pageIdx > 0) doc.addPage();
-                    
                     doc.setLineWidth(0.1); 
                     doc.setDrawColor(100); 
                     doc.setLineDashPattern([3, 3], 0); 
@@ -152,49 +310,42 @@
                         const colIdx = cardIdx % cols; 
                         const rowIdx = Math.floor(cardIdx / cols);
 
-                        // RTL Layout Logic
-                        // Even though we reverse text, we still need to calculate the BOX position correctly
-                        // col 0 is Right, col 1 is Left
                         const xPos = margin + ((cols - 1 - colIdx) * cardWidth);
                         const yPos = margin + (rowIdx * cardHeight);
 
                         doc.rect(xPos, yPos, cardWidth, cardHeight);
 
-                        doc.setFontSize(14);
+                        doc.setFontSize(13);
                         doc.setTextColor(0);
 
-                        // Align text to the RIGHT edge of the card
-                        const textRightEdge = xPos + cardWidth - 10;
-                        const textTopStart = yPos + 25; 
+                        const textRightEdge = xPos + cardWidth - 8;
+                        const textTopStart = yPos + 25;
                         const lineHeight = 9;
 
                         cardWords.forEach((word, wIdx) => {
-                            // 1. Create the string "1. Word"
                             let fullString = `${wIdx + 1}. ${word}`;
-                            
-                            // 2. Reverse the ENTIRE string for the fix
-                            // "1. שלום" becomes "םולש .1"
                             let reversedString = reverseString(fullString);
-
-                            // 3. Draw it ALIGNED RIGHT, but turn OFF the 'rtl' flag
-                            // We are manually feeding it visual RTL, so we tell the PDF it's standard text.
                             doc.text(reversedString, textRightEdge, textTopStart + (wIdx * lineHeight), { 
-                                align: 'right',
-                                rtl: false  // Important: We handled RTL ourselves
+                                align: 'right', 
+                                rtl: false 
                             });
                         });
                     });
                 });
 
-                statusDiv.innerText = "Downloading...";
-                doc.save('HebrewCards_Fixed.pdf');
-                statusDiv.innerText = "Done! Check your Downloads.";
+                statusDiv.innerText = "ההורדה החלה!";
+                doc.save('Elias_Cards_Filled.pdf');
+                
+                setTimeout(() => { statusDiv.innerText = "הקובץ מוכן."; }, 2000);
 
             } catch (e) {
                 console.error(e);
-                statusDiv.innerText = "Error: " + e.message;
+                statusDiv.innerText = "שגיאה: " + e.message;
             }
         }
+        
+        // Initialize stats on load
+        window.onload = updateStats;
     </script>
 </body>
 </html>
