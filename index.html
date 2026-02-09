@@ -2,23 +2,22 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>9-Card Grid (3x3)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hebrew Cards - Safe PDF</title>
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* --- Screen Styling --- */
+        /* --- Screen UI --- */
         body {
             font-family: 'Rubik', sans-serif;
-            background-color: #f0f2f5;
+            background: #f4f4f4;
             margin: 0;
-            padding: 15px;
-            color: #333;
+            padding: 20px;
             text-align: center;
         }
 
-        .no-print-container {
+        .input-screen {
             max-width: 600px;
-            margin: 0 auto 20px auto;
+            margin: 0 auto;
             background: white;
             padding: 20px;
             border-radius: 12px;
@@ -27,118 +26,108 @@
 
         textarea {
             width: 100%;
-            height: 120px;
-            padding: 12px;
-            font-size: 16px;
-            border: 2px solid #ddd;
+            height: 150px;
+            padding: 10px;
+            border: 1px solid #ccc;
             border-radius: 8px;
-            margin-bottom: 15px;
+            font-size: 16px;
             box-sizing: border-box;
+            margin-bottom: 15px;
         }
 
         button {
-            width: 100%;
-            background-color: #e53e3e; /* Red/Pink for visibility */
+            background-color: #007bff;
             color: white;
+            padding: 15px 30px;
             border: none;
-            padding: 14px;
+            border-radius: 8px;
             font-size: 18px;
             font-weight: bold;
-            border-radius: 8px;
+            width: 100%;
             cursor: pointer;
         }
 
-        #output-area {
+        /* --- Print/PDF Layout (Hidden on screen) --- */
+        #print-area {
             display: none;
-            overflow-x: auto;
-            padding-bottom: 20px;
         }
 
-        /* --- A4 Portrait Sheet (3x3 Grid) --- */
-        .sheet {
-            background: white;
-            width: 210mm; 
-            height: 296mm; /* Full A4 Height */
-            padding: 0;
-            margin: 0 auto 30px auto;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            
-            /* Grid: 3 Columns x 3 Rows */
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: repeat(3, 1fr);
-            gap: 0; /* Cards touch */
-            page-break-after: always;
-        }
-
-        /* --- Card Styling --- */
-        .card {
-            --cut-line: 1px dashed #aaa;
-            
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center; 
-            text-align: center;
-            padding: 10px;
-            
-            font-size: 13pt; 
-            line-height: 1.5;
-            position: relative;
-            overflow: hidden;
-        }
-
-        /* --- 3x3 Border Logic --- */
-        /* Add Right Border to Columns 1 and 2 (Not 3) */
-        .card:not(:nth-child(3n)) {
-            border-right: var(--cut-line);
-        }
-
-        /* Add Bottom Border to Rows 1 and 2 (Items 1-6) */
-        .card:nth-child(-n+6) {
-            border-bottom: var(--cut-line);
-        }
-
-        .word-item { margin-bottom: 6px; width: 100%; }
-        .number { font-weight: bold; color: #666; margin-left: 4px; }
-
-        /* --- Print Settings --- */
+        /* --- CSS for the PDF Output --- */
         @media print {
             @page {
-                size: A4 portrait; 
-                margin: 0;
+                size: A4 portrait;
+                margin: 10mm; /* Force a standard margin */
             }
-            body { margin: 0; background: white; }
-            .no-print-container { display: none; }
-            #output-area { display: block; }
-            .sheet {
-                box-shadow: none;
+            body {
+                background: white;
                 margin: 0;
-                width: 210mm;
-                height: 297mm;
+                padding: 0;
             }
-            .card { --cut-line: 1px dashed #444; }
+            .input-screen { display: none; }
+            #print-area { display: block; }
+        }
+
+        /* Using a Table is safer for keeping borders intact on PDF */
+        .page-table {
+            width: 100%; 
+            max-width: 190mm; /* Keep it narrower than A4 width (210mm) */
+            height: 250mm;    /* Keep it shorter than A4 height (297mm) */
+            border-collapse: collapse;
+            margin: 0 auto;   /* Center it */
+            page-break-after: always;
+            table-layout: fixed;
+        }
+
+        .card-cell {
+            border: 1px dashed #666; /* The cut lines */
+            width: 50%; /* 2 Columns */
+            height: 25%; /* 4 Rows */
+            vertical-align: middle;
+            padding: 10px;
+            box-sizing: border-box;
+            text-align: right;
+        }
+
+        .card-content {
+            font-size: 14pt;
+            line-height: 1.6;
+            padding-right: 15px;
+        }
+
+        .word-row {
+            margin-bottom: 5px;
+        }
+        
+        .number {
+            font-weight: bold;
+            color: #444;
+            display: inline-block;
+            width: 20px;
         }
     </style>
 </head>
 <body>
 
-    <div class="no-print-container">
-        <h2>מחולל כרטיסים (3x3)</h2>
-        <p>פריסה של 9 כרטיסים בדף (3 טורים, 3 שורות).<br>מנצל את כל הדף ללא שוליים.</p>
+    <div class="input-screen" id="ui-layer">
+        <h2>מחולל כרטיסים (גרסת PDF בטוחה)</h2>
+        <p>This version uses smaller cards to ensure they don't get cut off by printer margins.</p>
         <textarea id="wordInput" placeholder="הדבק מילים כאן..."></textarea>
-        <button onclick="generateAndPrint()">צור 9 כרטיסים לדף</button>
+        <button onclick="preparePDF()">Prepare PDF View</button>
     </div>
 
-    <div id="output-area"></div>
+    <div id="print-area"></div>
 
     <script>
-        function generateAndPrint() {
+        function preparePDF() {
             const input = document.getElementById('wordInput').value;
-            const outputArea = document.getElementById('output-area');
+            const outputArea = document.getElementById('print-area');
             
             let words = input.split('\n').map(w => w.trim()).filter(w => w.length > 0);
-            if (words.length === 0) { alert("נא להזין מילים"); return; }
+
+            if (words.length === 0) {
+                alert("Please enter words.");
+                return;
+            }
 
             // Shuffle
             for (let i = words.length - 1; i > 0; i--) {
@@ -147,57 +136,62 @@
             }
 
             outputArea.innerHTML = '';
-            outputArea.style.display = 'block';
 
             const wordsPerCard = 4;
-            const cardsPerPage = 9; // UPDATED to 9
+            const cardsPerPage = 8; // 2 cols * 4 rows
             
-            // Logic
+            // Group words
             let cards = [];
             for (let i = 0; i < words.length; i += wordsPerCard) {
                 cards.push(words.slice(i, i + wordsPerCard));
             }
 
-            // Fill last card logic
-            let lastCard = cards[cards.length-1];
-            while(lastCard.length < wordsPerCard) lastCard.push("");
-
-            // Page Grouping
+            // Group cards into pages
             let pages = [];
             for (let i = 0; i < cards.length; i += cardsPerPage) {
                 pages.push(cards.slice(i, i + cardsPerPage));
             }
 
-            // Render
+            // Build Tables
             pages.forEach(pageCards => {
-                const sheetDiv = document.createElement('div');
-                sheetDiv.className = 'sheet';
+                const table = document.createElement('table');
+                table.className = 'page-table';
 
-                pageCards.forEach(cardWords => {
-                    const cardDiv = document.createElement('div');
-                    cardDiv.className = 'card';
+                let cardIndex = 0;
+                
+                // Create 4 rows
+                for (let r = 0; r < 4; r++) {
+                    const tr = document.createElement('tr');
                     
-                    let htmlContent = '';
-                    cardWords.forEach((word, index) => {
-                        const content = word ? `<span class="number">${index + 1}.</span> ${word}` : "&nbsp;";
-                        htmlContent += `<div class="word-item">${content}</div>`;
-                    });
-                    cardDiv.innerHTML = htmlContent;
-                    sheetDiv.appendChild(cardDiv);
-                });
+                    // Create 2 columns
+                    for (let c = 0; c < 2; c++) {
+                        const td = document.createElement('td');
+                        td.className = 'card-cell';
 
-                // Fill empty page slots to keep grid perfect
-                while(sheetDiv.children.length < cardsPerPage) {
-                    const empty = document.createElement('div');
-                    empty.className = 'card';
-                    empty.innerHTML = '&nbsp;';
-                    sheetDiv.appendChild(empty);
+                        if (cardIndex < pageCards.length) {
+                            const currentCardWords = pageCards[cardIndex];
+                            let html = '<div class="card-content">';
+                            currentCardWords.forEach((word, idx) => {
+                                html += `<div class="word-row"><span class="number">${idx + 1}.</span> ${word}</div>`;
+                            });
+                            html += '</div>';
+                            td.innerHTML = html;
+                        } else {
+                            td.innerHTML = '&nbsp;';
+                        }
+                        
+                        tr.appendChild(td);
+                        cardIndex++;
+                    }
+                    table.appendChild(tr);
                 }
-
-                outputArea.appendChild(sheetDiv);
+                outputArea.appendChild(table);
             });
 
-            setTimeout(() => window.print(), 500);
+            // Trigger Print
+            setTimeout(() => {
+                window.print();
+            }, 500);
         }
     </script>
 </body>
