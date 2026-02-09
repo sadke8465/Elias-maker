@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hebrew PDF Generator</title>
+    <title>Hebrew Cards PDF</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         body {
@@ -32,7 +32,7 @@
             margin-bottom: 20px;
         }
         button {
-            background-color: #007bff;
+            background-color: #2f855a;
             color: white;
             border: none;
             padding: 15px 30px;
@@ -40,33 +40,28 @@
             border-radius: 8px;
             cursor: pointer;
             width: 100%;
+            font-weight: bold;
         }
         #status {
             margin-top: 15px;
-            color: #666;
+            color: #555;
             font-size: 0.9em;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>מחולל PDF (גרסה אמינה)</h2>
-        <p>This method generates a real PDF file to prevent cutting on iOS.</p>
+        <h2>מחולל PDF (פונט מקומי)</h2>
+        <p>Ensure <strong>GoogleSans_17pt-Medium.ttf</strong> is in the same folder as this file.</p>
         <textarea id="wordInput" placeholder="הדבק מילים כאן..."></textarea>
-        <button onclick="generateRealPDF()">Generate Real PDF</button>
+        <button onclick="generateRealPDF()">Generate PDF</button>
         <div id="status"></div>
     </div>
 
     <script>
-        // Helper to fetch font file as binary data
-        async function loadFont(url) {
-            const response = await fetch(url);
-            const buffer = await response.arrayBuffer();
-            return arrayBufferToBase64(buffer);
-        }
-
-        // Standard buffer to base64 conversion
+        // Helper: Convert binary font data to Base64
         function arrayBufferToBase64(buffer) {
             let binary = '';
             const bytes = new Uint8Array(buffer);
@@ -82,97 +77,118 @@
             const statusDiv = document.getElementById('status');
             
             let words = input.split('\n').map(w => w.trim()).filter(w => w.length > 0);
-            if (words.length === 0) { alert("Please enter words."); return; }
+            if (words.length === 0) { alert("אנא הכנס מילים"); return; }
 
-            statusDiv.innerText = "Loading Hebrew fonts and generating... please wait.";
+            statusDiv.innerText = "Generating PDF...";
 
             try {
-                // 1. Initialize jsPDF
                 const { jsPDF } = window.jspdf;
-                // A4 Portrait: 210mm width, 297mm height
+                // A4 Portrait
                 const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
 
-                // 2. Load and add a Hebrew font (Rubik from Google Fonts)
-                // We must load a font that supports Hebrew characters. Standard PDF fonts do not.
-                const fontURL = 'https://github.com/google/fonts/raw/main/ofl/rubik/Rubik-Regular.ttf';
-                const fontBase64 = await loadFont(fontURL);
+                // --- FONT LOADING SECTION ---
+                // We use the exact filename you provided
+                const fontFilename = 'GoogleSans_17pt-Medium.ttf';
                 
-                doc.addFileToVFS('Rubik-Regular.ttf', fontBase64);
-                doc.addFont('Rubik-Regular.ttf', 'Rubik', 'normal');
-                doc.setFont('Rubik');
+                try {
+                    const response = await fetch(fontFilename);
+                    if (!response.ok) throw new Error("Could not find font file.");
+                    const buffer = await response.arrayBuffer();
+                    const fontBase64 = arrayBufferToBase64(buffer);
 
-                // 3. Configuration for layout
-                const margin = 12; // 12mm safe margin all around
+                    // Add font to PDF
+                    doc.addFileToVFS(fontFilename, fontBase64);
+                    doc.addFont(fontFilename, 'MyHebrewFont', 'normal');
+                    doc.setFont('MyHebrewFont');
+                } catch (fontError) {
+                    alert("Error loading font: " + fontFilename + "\nMake sure the file is in the root folder.");
+                    statusDiv.innerText = "Font load failed.";
+                    return;
+                }
+
+                // --- PDF LAYOUT CALCULATIONS ---
+                const margin = 10; 
                 const pageWidth = 210;
                 const pageHeight = 297;
-                const printableWidth = pageWidth - (margin * 2); // 186mm
-                const printableHeight = pageHeight - (margin * 2); // 273mm
                 
+                // 2 Cols x 4 Rows
                 const cols = 2;
                 const rows = 4;
-                const cardWidth = printableWidth / cols; // 93mm
-                const cardHeight = printableHeight / rows; // 68.25mm
+                
+                const printableWidth = pageWidth - (margin * 2);
+                const printableHeight = pageHeight - (margin * 2);
+                
+                const cardWidth = printableWidth / cols;   // ~95mm
+                const cardHeight = printableHeight / rows; // ~69mm
 
-                // 4. Shuffle & Group Words
+                // Shuffle
                 for (let i = words.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [words[i], words[j]] = [words[j], words[i]];
                 }
+
+                // Chunking
                 const wordsPerCard = 4;
                 const cardsPerPage = cols * rows;
                 let cards = [];
-                for (let i = 0; i < words.length; i += wordsPerCard) cards.push(words.slice(i, i + wordsPerCard));
+                for (let i = 0; i < words.length; i += wordsPerCard) {
+                    cards.push(words.slice(i, i + wordsPerCard));
+                }
                 let pages = [];
-                for (let i = 0; i < cards.length; i += cardsPerPage) pages.push(cards.slice(i, i + cardsPerPage));
+                for (let i = 0; i < cards.length; i += cardsPerPage) {
+                    pages.push(cards.slice(i, i + cardsPerPage));
+                }
 
-                // 5. Draw the PDF
+                // --- DRAWING ---
                 pages.forEach((pageCards, pageIdx) => {
                     if (pageIdx > 0) doc.addPage();
                     
-                    doc.setLineWidth(0.3);
-                    doc.setDrawColor(150); // Gray color for lines
-                    doc.setLineDashPattern([3, 3], 0); // Dashed lines
+                    // Set styles
+                    doc.setLineWidth(0.1); 
+                    doc.setDrawColor(100); // Dark Gray lines
+                    doc.setLineDashPattern([3, 3], 0); // Dashed lines for cutting
 
                     pageCards.forEach((cardWords, cardIdx) => {
-                        // Calculate grid position
-                        const colIdx = cardIdx % cols; // 0 or 1
-                        const rowIdx = Math.floor(cardIdx / cols); // 0 to 3
+                        // Calculate position
+                        const colIdx = cardIdx % cols; 
+                        const rowIdx = Math.floor(cardIdx / cols);
 
-                        // Calculate absolute coordinates on paper
-                        // Important for RTL: Col 0 is on the RIGHT side visually
-                        // So if colIdx is 0, x is margin + cardWidth. If colIdx is 1, x is margin.
+                        // RTL Logic for Columns: Col 0 is visually on the Right
+                        // xPos is the top-left corner of the cell
                         const xPos = margin + ((cols - 1 - colIdx) * cardWidth);
                         const yPos = margin + (rowIdx * cardHeight);
 
-                        // Draw Cell Border (Dashed)
+                        // Draw Border
                         doc.rect(xPos, yPos, cardWidth, cardHeight);
 
-                        // Draw Text
+                        // Text Settings
                         doc.setFontSize(14);
-                        doc.setTextColor(0); // Black
-                        
-                        const textStartX = xPos + cardWidth - 10; // Start 10mm from right edge of card
-                        let textStartY = yPos + 20; // Start 20mm from top edge of card
-                        const lineHeight = 8;
+                        doc.setTextColor(0);
+
+                        // Text alignment
+                        // We align RIGHT. The X coordinate for right-alignment is (xPos + cardWidth - padding)
+                        const textRightEdge = xPos + cardWidth - 10;
+                        const textTopStart = yPos + 25; // 25mm from top of card
+                        const lineHeight = 9;
 
                         cardWords.forEach((word, wIdx) => {
                             const textLine = `${wIdx + 1}. ${word}`;
-                            // rtl: true handles Hebrew direction automatically
-                            doc.text(textLine, textStartX, textStartY + (wIdx * lineHeight), { align: 'right', rtl: true });
+                            doc.text(textLine, textRightEdge, textTopStart + (wIdx * lineHeight), { 
+                                align: 'right', 
+                                rtl: true 
+                            });
                         });
                     });
                 });
 
-                statusDiv.innerText = "Done! Opening PDF...";
+                statusDiv.innerText = "Done! Opening...";
                 
-                // 6. Output for iOS
-                // This forces Safari to open the raw PDF data in the current window
+                // Open PDF in new window (forces iOS viewer)
                 doc.output('dataurlnewwindow');
-                statusDiv.innerText = ""; // Clear status
-
+                
             } catch (e) {
-                alert("Error generating PDF. Ensure internet connection for font download.\n" + e.message);
-                statusDiv.innerText = "Error failed.";
+                console.error(e);
+                alert("An error occurred: " + e.message);
             }
         }
     </script>
