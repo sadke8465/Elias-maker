@@ -3,195 +3,177 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hebrew Cards - Safe PDF</title>
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;700&display=swap" rel="stylesheet">
+    <title>Hebrew PDF Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        /* --- Screen UI --- */
         body {
-            font-family: 'Rubik', sans-serif;
-            background: #f4f4f4;
-            margin: 0;
+            font-family: sans-serif;
+            background: #f0f2f5;
             padding: 20px;
             text-align: center;
         }
-
-        .input-screen {
-            max-width: 600px;
-            margin: 0 auto;
+        .container {
             background: white;
-            padding: 20px;
+            padding: 25px;
             border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            max-width: 600px;
+            margin: auto;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-
         textarea {
             width: 100%;
             height: 150px;
             padding: 10px;
+            box-sizing: border-box;
             border: 1px solid #ccc;
             border-radius: 8px;
             font-size: 16px;
-            box-sizing: border-box;
-            margin-bottom: 15px;
+            text-align: right;
+            margin-bottom: 20px;
         }
-
         button {
             background-color: #007bff;
             color: white;
-            padding: 15px 30px;
             border: none;
-            border-radius: 8px;
+            padding: 15px 30px;
             font-size: 18px;
-            font-weight: bold;
-            width: 100%;
+            border-radius: 8px;
             cursor: pointer;
+            width: 100%;
         }
-
-        /* --- Print/PDF Layout (Hidden on screen) --- */
-        #print-area {
-            display: none;
-        }
-
-        /* --- CSS for the PDF Output --- */
-        @media print {
-            @page {
-                size: A4 portrait;
-                margin: 10mm; /* Force a standard margin */
-            }
-            body {
-                background: white;
-                margin: 0;
-                padding: 0;
-            }
-            .input-screen { display: none; }
-            #print-area { display: block; }
-        }
-
-        /* Using a Table is safer for keeping borders intact on PDF */
-        .page-table {
-            width: 100%; 
-            max-width: 190mm; /* Keep it narrower than A4 width (210mm) */
-            height: 250mm;    /* Keep it shorter than A4 height (297mm) */
-            border-collapse: collapse;
-            margin: 0 auto;   /* Center it */
-            page-break-after: always;
-            table-layout: fixed;
-        }
-
-        .card-cell {
-            border: 1px dashed #666; /* The cut lines */
-            width: 50%; /* 2 Columns */
-            height: 25%; /* 4 Rows */
-            vertical-align: middle;
-            padding: 10px;
-            box-sizing: border-box;
-            text-align: right;
-        }
-
-        .card-content {
-            font-size: 14pt;
-            line-height: 1.6;
-            padding-right: 15px;
-        }
-
-        .word-row {
-            margin-bottom: 5px;
-        }
-        
-        .number {
-            font-weight: bold;
-            color: #444;
-            display: inline-block;
-            width: 20px;
+        #status {
+            margin-top: 15px;
+            color: #666;
+            font-size: 0.9em;
         }
     </style>
 </head>
 <body>
 
-    <div class="input-screen" id="ui-layer">
-        <h2>מחולל כרטיסים (גרסת PDF בטוחה)</h2>
-        <p>This version uses smaller cards to ensure they don't get cut off by printer margins.</p>
+    <div class="container">
+        <h2>מחולל PDF (גרסה אמינה)</h2>
+        <p>This method generates a real PDF file to prevent cutting on iOS.</p>
         <textarea id="wordInput" placeholder="הדבק מילים כאן..."></textarea>
-        <button onclick="preparePDF()">Prepare PDF View</button>
+        <button onclick="generateRealPDF()">Generate Real PDF</button>
+        <div id="status"></div>
     </div>
 
-    <div id="print-area"></div>
-
     <script>
-        function preparePDF() {
+        // Helper to fetch font file as binary data
+        async function loadFont(url) {
+            const response = await fetch(url);
+            const buffer = await response.arrayBuffer();
+            return arrayBufferToBase64(buffer);
+        }
+
+        // Standard buffer to base64 conversion
+        function arrayBufferToBase64(buffer) {
+            let binary = '';
+            const bytes = new Uint8Array(buffer);
+            const len = bytes.byteLength;
+            for (let i = 0; i < len; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return window.btoa(binary);
+        }
+
+        async function generateRealPDF() {
             const input = document.getElementById('wordInput').value;
-            const outputArea = document.getElementById('print-area');
+            const statusDiv = document.getElementById('status');
             
             let words = input.split('\n').map(w => w.trim()).filter(w => w.length > 0);
+            if (words.length === 0) { alert("Please enter words."); return; }
 
-            if (words.length === 0) {
-                alert("Please enter words.");
-                return;
-            }
+            statusDiv.innerText = "Loading Hebrew fonts and generating... please wait.";
 
-            // Shuffle
-            for (let i = words.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [words[i], words[j]] = [words[j], words[i]];
-            }
+            try {
+                // 1. Initialize jsPDF
+                const { jsPDF } = window.jspdf;
+                // A4 Portrait: 210mm width, 297mm height
+                const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
 
-            outputArea.innerHTML = '';
-
-            const wordsPerCard = 4;
-            const cardsPerPage = 8; // 2 cols * 4 rows
-            
-            // Group words
-            let cards = [];
-            for (let i = 0; i < words.length; i += wordsPerCard) {
-                cards.push(words.slice(i, i + wordsPerCard));
-            }
-
-            // Group cards into pages
-            let pages = [];
-            for (let i = 0; i < cards.length; i += cardsPerPage) {
-                pages.push(cards.slice(i, i + cardsPerPage));
-            }
-
-            // Build Tables
-            pages.forEach(pageCards => {
-                const table = document.createElement('table');
-                table.className = 'page-table';
-
-                let cardIndex = 0;
+                // 2. Load and add a Hebrew font (Rubik from Google Fonts)
+                // We must load a font that supports Hebrew characters. Standard PDF fonts do not.
+                const fontURL = 'https://github.com/google/fonts/raw/main/ofl/rubik/Rubik-Regular.ttf';
+                const fontBase64 = await loadFont(fontURL);
                 
-                // Create 4 rows
-                for (let r = 0; r < 4; r++) {
-                    const tr = document.createElement('tr');
-                    
-                    // Create 2 columns
-                    for (let c = 0; c < 2; c++) {
-                        const td = document.createElement('td');
-                        td.className = 'card-cell';
+                doc.addFileToVFS('Rubik-Regular.ttf', fontBase64);
+                doc.addFont('Rubik-Regular.ttf', 'Rubik', 'normal');
+                doc.setFont('Rubik');
 
-                        if (cardIndex < pageCards.length) {
-                            const currentCardWords = pageCards[cardIndex];
-                            let html = '<div class="card-content">';
-                            currentCardWords.forEach((word, idx) => {
-                                html += `<div class="word-row"><span class="number">${idx + 1}.</span> ${word}</div>`;
-                            });
-                            html += '</div>';
-                            td.innerHTML = html;
-                        } else {
-                            td.innerHTML = '&nbsp;';
-                        }
-                        
-                        tr.appendChild(td);
-                        cardIndex++;
-                    }
-                    table.appendChild(tr);
+                // 3. Configuration for layout
+                const margin = 12; // 12mm safe margin all around
+                const pageWidth = 210;
+                const pageHeight = 297;
+                const printableWidth = pageWidth - (margin * 2); // 186mm
+                const printableHeight = pageHeight - (margin * 2); // 273mm
+                
+                const cols = 2;
+                const rows = 4;
+                const cardWidth = printableWidth / cols; // 93mm
+                const cardHeight = printableHeight / rows; // 68.25mm
+
+                // 4. Shuffle & Group Words
+                for (let i = words.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [words[i], words[j]] = [words[j], words[i]];
                 }
-                outputArea.appendChild(table);
-            });
+                const wordsPerCard = 4;
+                const cardsPerPage = cols * rows;
+                let cards = [];
+                for (let i = 0; i < words.length; i += wordsPerCard) cards.push(words.slice(i, i + wordsPerCard));
+                let pages = [];
+                for (let i = 0; i < cards.length; i += cardsPerPage) pages.push(cards.slice(i, i + cardsPerPage));
 
-            // Trigger Print
-            setTimeout(() => {
-                window.print();
-            }, 500);
+                // 5. Draw the PDF
+                pages.forEach((pageCards, pageIdx) => {
+                    if (pageIdx > 0) doc.addPage();
+                    
+                    doc.setLineWidth(0.3);
+                    doc.setDrawColor(150); // Gray color for lines
+                    doc.setLineDashPattern([3, 3], 0); // Dashed lines
+
+                    pageCards.forEach((cardWords, cardIdx) => {
+                        // Calculate grid position
+                        const colIdx = cardIdx % cols; // 0 or 1
+                        const rowIdx = Math.floor(cardIdx / cols); // 0 to 3
+
+                        // Calculate absolute coordinates on paper
+                        // Important for RTL: Col 0 is on the RIGHT side visually
+                        // So if colIdx is 0, x is margin + cardWidth. If colIdx is 1, x is margin.
+                        const xPos = margin + ((cols - 1 - colIdx) * cardWidth);
+                        const yPos = margin + (rowIdx * cardHeight);
+
+                        // Draw Cell Border (Dashed)
+                        doc.rect(xPos, yPos, cardWidth, cardHeight);
+
+                        // Draw Text
+                        doc.setFontSize(14);
+                        doc.setTextColor(0); // Black
+                        
+                        const textStartX = xPos + cardWidth - 10; // Start 10mm from right edge of card
+                        let textStartY = yPos + 20; // Start 20mm from top edge of card
+                        const lineHeight = 8;
+
+                        cardWords.forEach((word, wIdx) => {
+                            const textLine = `${wIdx + 1}. ${word}`;
+                            // rtl: true handles Hebrew direction automatically
+                            doc.text(textLine, textStartX, textStartY + (wIdx * lineHeight), { align: 'right', rtl: true });
+                        });
+                    });
+                });
+
+                statusDiv.innerText = "Done! Opening PDF...";
+                
+                // 6. Output for iOS
+                // This forces Safari to open the raw PDF data in the current window
+                doc.output('dataurlnewwindow');
+                statusDiv.innerText = ""; // Clear status
+
+            } catch (e) {
+                alert("Error generating PDF. Ensure internet connection for font download.\n" + e.message);
+                statusDiv.innerText = "Error failed.";
+            }
         }
     </script>
 </body>
