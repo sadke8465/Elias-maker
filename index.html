@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>מחולל אליאס + מילות מילוי</title>
+    <title>מחולל אליאס + מילות מילוי + עיצוב ותצוגה מקדימה</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         body {
@@ -17,7 +17,7 @@
             background: white;
             padding: 25px;
             border-radius: 12px;
-            max-width: 600px;
+            max-width: 650px;
             margin: auto;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
@@ -61,6 +61,110 @@
             font-size: 1.1em;
             color: #553c9a;
             font-weight: bold;
+        }
+
+        /* --- Design & Preview Panel --- */
+        .design-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            background: #fafafa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px dashed #ccc;
+            margin-bottom: 20px;
+            text-align: right;
+        }
+        .design-controls {
+            flex: 1;
+            min-width: 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .color-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+            padding: 5px 10px;
+            border-radius: 6px;
+            border: 1px solid #eee;
+        }
+        .color-item label {
+            font-size: 0.9em;
+            font-weight: bold;
+            color: #444;
+        }
+        .color-item input[type="color"] {
+            border: none;
+            width: 35px;
+            height: 30px;
+            border-radius: 4px;
+            cursor: pointer;
+            padding: 0;
+            background: none;
+        }
+        .width-item {
+            background: #fff;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #eee;
+        }
+        .width-item label {
+            font-size: 0.9em;
+            font-weight: bold;
+            color: #444;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* --- Live Card Preview --- */
+        .preview-wrapper {
+            flex: 1;
+            min-width: 180px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .preview-title {
+            font-size: 0.85em;
+            font-weight: bold;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .card-preview {
+            width: 130px;
+            height: 185px; /* פרופורציה של כרטיס אמיתי */
+            border: 1px dashed #000;
+            position: relative;
+            box-sizing: border-box;
+            padding: 10px; /* מייצג את ה-Padding של 5 מ"מ */
+            display: flex;
+            flex-direction: column;
+            background-color: #ffffff;
+            transition: all 0.2s ease;
+        }
+        .card-preview-inner {
+            flex: 1;
+            border: 2px solid #553c9a;
+            box-sizing: border-box;
+            padding: 15px 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 12px;
+            transition: all 0.2s ease;
+        }
+        .preview-row {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 4px;
+            font-size: 13px;
+            font-weight: bold;
+            font-family: inherit;
         }
 
         textarea {
@@ -121,6 +225,58 @@
             </div>
         </div>
 
+        <div class="design-panel">
+            <div class="design-controls">
+                <div class="color-item">
+                    <label>צבע רקע (עמוד)</label>
+                    <input type="color" id="bgColor" value="#ffffff" oninput="updatePreview()">
+                </div>
+                <div class="color-item">
+                    <label>צבע מסגרת פנימית</label>
+                    <input type="color" id="borderColor" value="#553c9a" oninput="updatePreview()">
+                </div>
+                <div class="color-item">
+                    <label>צבע טקסט</label>
+                    <input type="color" id="textColor" value="#000000" oninput="updatePreview()">
+                </div>
+                <div class="color-item">
+                    <label>צבע מספור</label>
+                    <input type="color" id="numberColor" value="#e53e3e" oninput="updatePreview()">
+                </div>
+                <div class="width-item">
+                    <label>
+                        <span>עובי מסגרת (מ"מ):</span>
+                        <span id="borderWidthDisplay" style="color: #553c9a;">1.0</span>
+                    </label>
+                    <input type="range" id="borderWidth" min="0.1" max="4.0" step="0.1" value="1.0" oninput="updatePreview()">
+                </div>
+            </div>
+
+            <div class="preview-wrapper">
+                <div class="preview-title">תצוגה מקדימה חיה</div>
+                <div id="cardPreview" class="card-preview">
+                    <div id="cardPreviewInner" class="card-preview-inner">
+                        <div class="preview-row">
+                            <span class="preview-text">דוגמה</span>
+                            <span class="preview-num">.1</span>
+                        </div>
+                        <div class="preview-row">
+                            <span class="preview-text">אליאס</span>
+                            <span class="preview-num">.2</span>
+                        </div>
+                        <div class="preview-row">
+                            <span class="preview-text">עיצוב</span>
+                            <span class="preview-num">.3</span>
+                        </div>
+                        <div class="preview-row">
+                            <span class="preview-text">צבעים</span>
+                            <span class="preview-num">.4</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <textarea id="wordInput" placeholder="הדבק את המילים שלך כאן..." oninput="handleInput()"></textarea>
         
         <button onclick="generateRealPDF()">הורד קובץ PDF</button>
@@ -128,10 +284,6 @@
     </div>
 
     <script>
-        /* ================================================================
-           --- מאגר המילים החדש שלך --- 
-           ================================================================
-        */
         const FILLER_POOL = [
             "שמש", "מטרייה", "גלידה", "רכבת", "חלון", "מפתח", "כדור", "מחברת", "עוגה", "שולחן",
             "כיסא", "טלפון", "שעון", "ים", "הר", "נהר", "ענן", "פרח", "עץ", "דשא",
@@ -153,79 +305,51 @@
             "טניס", "שחייה", "ריצה", "קפיצה", "שער", "קבוצה", "מאמן", "שופט", "בוקר", "צהריים",
             "ערב", "לילה", "שבוע", "חודש", "שנה", "אתמול", "מחר", "עכשיו"
         ];
-        
-        // --- Logic Start ---
 
-        // Get user words without duplicates
         function getUserWords() {
             const input = document.getElementById('wordInput').value;
             return input.split('\n').map(w => w.trim()).filter(w => w.length > 0);
         }
 
-        // Handle text typing: update slider min/max and stats
         function handleInput() {
-            const userWords = [...new Set(getUserWords())]; // Unique user words
+            const userWords = [...new Set(getUserWords())];
             const slider = document.getElementById('wordGoalSlider');
-            
-            // Set slider minimum to at least the number of words user typed
             const currentCount = userWords.length;
             slider.min = currentCount;
-            
-            // If user typed more than current slider value, push slider up
-            if (parseInt(slider.value) < currentCount) {
-                slider.value = currentCount;
-            }
-            
+            if (parseInt(slider.value) < currentCount) slider.value = currentCount;
             updateStats();
         }
 
-        // Calculate final list (User + Filler) and update UI
         function getFinalList() {
-            const userWords = [...new Set(getUserWords())]; // Remove duplicates from user input
+            const userWords = [...new Set(getUserWords())];
             const sliderVal = parseInt(document.getElementById('wordGoalSlider').value);
-            
             let finalList = [...userWords];
-            
-            // Calculate how many filler words are needed
             const needed = sliderVal - finalList.length;
             
             if (needed > 0) {
-                // Filter the pool to exclude words the user already typed
                 const availableFillers = FILLER_POOL.filter(w => !finalList.includes(w));
-                
-                // Shuffle the available fillers
                 for (let i = availableFillers.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [availableFillers[i], availableFillers[j]] = [availableFillers[j], availableFillers[i]];
                 }
-                
-                // Take the needed amount (or as many as available if pool runs dry)
                 const fillersToAdd = availableFillers.slice(0, needed);
                 finalList = finalList.concat(fillersToAdd);
             }
-            
             return finalList;
         }
 
         function updateStats() {
             const slider = document.getElementById('wordGoalSlider');
             const display = document.getElementById('sliderValue');
-            
-            // Update slider number display
             display.innerText = slider.value;
-
-            // Calculate stats based on the TARGET number (slider value)
             const totalWords = parseInt(slider.value);
             const totalCards = Math.ceil(totalWords / 4);
             const totalPages = Math.ceil(totalCards / 9);
-
             document.getElementById('finalWordCount').innerText = totalWords;
             document.getElementById('cardCount').innerText = totalCards;
             document.getElementById('pageCount').innerText = totalPages;
         }
 
-        // --- PDF Generation ---
-        
         function arrayBufferToBase64(buffer) {
             let binary = '';
             const bytes = new Uint8Array(buffer);
@@ -238,37 +362,77 @@
             return str.split("").reverse().join("");
         }
 
+        function getContrastColor(hexcolor) {
+            hexcolor = hexcolor.replace("#", "");
+            const r = parseInt(hexcolor.substr(0,2),16);
+            const g = parseInt(hexcolor.substr(2,2),16);
+            const b = parseInt(hexcolor.substr(4,2),16);
+            const yiq = ((r*299)+(g*587)+(b*114))/1000;
+            return (yiq >= 128) ? '#000000' : '#ffffff';
+        }
+
+        // --- עדכון התצוגה המקדימה החיה ---
+        function updatePreview() {
+            const bgColor = document.getElementById('bgColor').value;
+            const borderColor = document.getElementById('borderColor').value;
+            const textColor = document.getElementById('textColor').value;
+            const numberColor = document.getElementById('numberColor').value;
+            const borderWidth = document.getElementById('borderWidth').value;
+
+            // עדכון תצוגת המספר של עובי המסגרת
+            document.getElementById('borderWidthDisplay').innerText = parseFloat(borderWidth).toFixed(1);
+
+            const card = document.getElementById('cardPreview');
+            const innerCard = document.getElementById('cardPreviewInner');
+            const texts = document.querySelectorAll('.preview-text');
+            const numbers = document.querySelectorAll('.preview-num');
+
+            // רקע וניגודיות סימני חיתוך
+            card.style.backgroundColor = bgColor;
+            card.style.borderColor = getContrastColor(bgColor);
+
+            // מסגרת פנימית (הכפלה קלה בפיקסלים כדי שייראה יחסי לתצוגה)
+            innerCard.style.border = `${borderWidth * 1.5}px solid ${borderColor}`;
+
+            // צבעי טקסט ומספר
+            texts.forEach(t => t.style.color = textColor);
+            numbers.forEach(n => n.style.color = numberColor);
+        }
+
         async function generateRealPDF() {
-            // 1. Get the final combined list
             let words = getFinalList();
             const statusDiv = document.getElementById('status');
             
             if (words.length === 0) { alert("אנא הכנס מילים או הזז את הסליידר."); return; }
-
             statusDiv.innerText = "מכין את הקובץ...";
+
+            const bgColor = document.getElementById('bgColor').value;
+            const borderColor = document.getElementById('borderColor').value;
+            const textColor = document.getElementById('textColor').value;
+            const numberColor = document.getElementById('numberColor').value;
+            const borderWidth = parseFloat(document.getElementById('borderWidth').value);
+            
+            const cutMarkColor = getContrastColor(bgColor);
 
             try {
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
 
-                // Load Font
                 const fontFilename = 'GoogleSans_17pt-Medium.ttf';
                 try {
                     const response = await fetch(fontFilename);
                     if (!response.ok) throw new Error("Font file not found");
                     const buffer = await response.arrayBuffer();
                     const fontBase64 = arrayBufferToBase64(buffer);
-
                     doc.addFileToVFS(fontFilename, fontBase64);
                     doc.addFont(fontFilename, 'CustomFont', 'normal');
                     doc.setFont('CustomFont');
                 } catch (fontError) {
                     statusDiv.innerText = "שגיאה: קובץ הפונט חסר.";
-                    alert("לא ניתן לטעון את הפונט. ודא ש-GoogleSans_17pt-Medium.ttf קיים.");
+                    alert("לא ניתן לטעון את הפונט. ודא ש-GoogleSans_17pt-Medium.ttf קיים באותה תיקייה.");
                     return;
                 }
 
-                // Layout Config (3x3)
                 const margin = 10; 
                 const pageWidth = 210;
                 const pageHeight = 297;
@@ -279,13 +443,11 @@
                 const cardWidth = printableWidth / cols;
                 const cardHeight = printableHeight / rows;
 
-                // 2. SHUFFLE EVERYTHING 
                 for (let i = words.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [words[i], words[j]] = [words[j], words[i]];
                 }
 
-                // Chunking
                 const wordsPerCard = 4;
                 const cardsPerPage = cols * rows; 
                 
@@ -299,42 +461,56 @@
                     pages.push(cards.slice(i, i + cardsPerPage));
                 }
 
-                // Drawing
                 pages.forEach((pageCards, pageIdx) => {
                     if (pageIdx > 0) doc.addPage();
-                    doc.setLineWidth(0.1); 
-                    doc.setDrawColor(100); 
-                    doc.setLineDashPattern([3, 3], 0); 
+                    
+                    doc.setFillColor(bgColor);
+                    doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
                     pageCards.forEach((cardWords, cardIdx) => {
                         const colIdx = cardIdx % cols; 
                         const rowIdx = Math.floor(cardIdx / cols);
-
                         const xPos = margin + ((cols - 1 - colIdx) * cardWidth);
                         const yPos = margin + (rowIdx * cardHeight);
 
-                        doc.rect(xPos, yPos, cardWidth, cardHeight);
+                        const pad = 5; 
+                        doc.setDrawColor(borderColor);
+                        doc.setLineWidth(borderWidth); 
+                        doc.setLineDashPattern([], 0); 
+                        doc.rect(xPos + pad, yPos + pad, cardWidth - (pad * 2), cardHeight - (pad * 2), 'S');
+
+                        doc.setDrawColor(cutMarkColor);
+                        doc.setLineWidth(0.2);
+                        doc.setLineDashPattern([3, 3], 0); 
+                        doc.rect(xPos, yPos, cardWidth, cardHeight, 'S');
 
                         doc.setFontSize(13);
-                        doc.setTextColor(0);
 
-                        const textRightEdge = xPos + cardWidth - 8;
-                        const textTopStart = yPos + 25;
-                        const lineHeight = 9;
+                        const textRightEdge = xPos + cardWidth - pad - 4;
+                        const textTopStart = yPos + pad + 15;
+                        const lineHeight = 10;
+                        const spaceWidth = doc.getTextWidth(" ");
 
                         cardWords.forEach((word, wIdx) => {
-                            let fullString = `${wIdx + 1}. ${word}`;
-                            let reversedString = reverseString(fullString);
-                            doc.text(reversedString, textRightEdge, textTopStart + (wIdx * lineHeight), { 
-                                align: 'right', 
-                                rtl: false 
-                            });
+                            const yText = textTopStart + (wIdx * lineHeight);
+                            
+                            const numStr = (wIdx + 1) + ".";
+                            const revNumStr = reverseString(numStr);
+                            
+                            doc.setTextColor(numberColor);
+                            doc.text(revNumStr, textRightEdge, yText, { align: 'right' });
+                            
+                            const numWidth = doc.getTextWidth(revNumStr);
+                            
+                            const revWord = reverseString(word);
+                            doc.setTextColor(textColor);
+                            doc.text(revWord, textRightEdge - numWidth - spaceWidth, yText, { align: 'right' });
                         });
                     });
                 });
 
                 statusDiv.innerText = "ההורדה החלה!";
-                doc.save('Elias_Cards_Filled.pdf');
+                doc.save('Elias_Cards_Customized.pdf');
                 
                 setTimeout(() => { statusDiv.innerText = "הקובץ מוכן."; }, 2000);
 
@@ -344,8 +520,11 @@
             }
         }
         
-        // Initialize stats on load
-        window.onload = updateStats;
+        // אתחול נתונים ותצוגה מקדימה בטעינת העמוד
+        window.onload = () => {
+            updateStats();
+            updatePreview();
+        };
     </script>
 </body>
 </html>
