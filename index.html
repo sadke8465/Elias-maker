@@ -118,6 +118,33 @@
             display: flex;
             justify-content: space-between;
         }
+        [hidden] { display: none !important; }
+        .back-options {
+            background: #fff;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #eee;
+            font-size: 0.9em;
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .checkbox-item input { accent-color: #553c9a; }
+        #cardBackControls { margin-top: 12px; }
+        #cardBackControls label { display: block; margin-bottom: 8px; }
+        #cardBackInput { width: 100%; font: inherit; }
+        .back-help { color: #666; font-size: 0.85em; line-height: 1.5; }
+        #cardBackStatus { margin-top: 8px; overflow-wrap: anywhere; }
+        #removeCardBack {
+            width: auto;
+            margin-top: 8px;
+            padding: 8px 12px;
+            font-size: 14px;
+        }
 
         /* --- Live Card Preview --- */
         .preview-wrapper {
@@ -166,6 +193,20 @@
             font-weight: bold;
             font-family: inherit;
         }
+        #cardBackPreviewSection {
+            margin-top: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .card-back-preview { align-items: center; justify-content: center; }
+        .card-back-preview img {
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            object-fit: contain;
+        }
+        #cardBackPlaceholder { font-size: 12px; color: #666; }
 
         textarea {
             width: 100%;
@@ -194,6 +235,7 @@
             transition: background 0.2s;
         }
         button:hover { background-color: #44307b; }
+        button:disabled { opacity: 0.6; cursor: wait; }
         #status { margin-top: 15px; font-weight: bold; color: #555; }
     </style>
 </head>
@@ -250,6 +292,20 @@
                     </label>
                     <input type="range" id="borderWidth" min="0.1" max="4.0" step="0.1" value="1.0" oninput="updatePreview()">
                 </div>
+                <div class="back-options">
+                    <label class="checkbox-item" for="includeCardBack">
+                        <input type="checkbox" id="includeCardBack" onchange="updateBackOptions()">
+                        הוסף גרפיקה לגב הכרטיסים
+                    </label>
+                    <div id="cardBackControls" hidden>
+                        <label for="cardBackInput">בחר תמונה לגב הכרטיסים</label>
+                        <input type="file" id="cardBackInput" accept="image/png,image/jpeg,image/webp" aria-describedby="cardBackHelp cardBackStatus" onchange="loadCardBack(event)">
+                        <p id="cardBackHelp" class="back-help">PNG, JPG או WebP. התמונה תופיע בגב כל הכרטיסים ותשמור על הפרופורציות שלה.</p>
+                        <p class="back-help">להדפסה דו־צדדית: בחר הדפסה בגודל המקורי (100%) והיפוך בקצה הארוך. עמודי החזית והגב יופיעו לסירוגין בקובץ.</p>
+                        <div id="cardBackStatus" role="status" aria-live="polite"></div>
+                        <button type="button" id="removeCardBack" onclick="clearCardBack()" hidden>הסר תמונה</button>
+                    </div>
+                </div>
             </div>
 
             <div class="preview-wrapper">
@@ -274,12 +330,19 @@
                         </div>
                     </div>
                 </div>
+                <div id="cardBackPreviewSection" hidden>
+                    <div class="preview-title">תצוגה מקדימה — גב הכרטיס</div>
+                    <div id="cardBackPreview" class="card-preview card-back-preview">
+                        <img id="cardBackPreviewImage" alt="הגרפיקה שנבחרה לגב הכרטיסים" hidden>
+                        <span id="cardBackPlaceholder">בחר תמונה לתצוגה מקדימה</span>
+                    </div>
+                </div>
             </div>
         </div>
 
         <textarea id="wordInput" placeholder="הדבק את המילים שלך כאן..." oninput="handleInput()"></textarea>
         
-        <button onclick="generateRealPDF()">הורד קובץ PDF</button>
+        <button id="downloadPDF" onclick="generateRealPDF()">הורד קובץ PDF</button>
         <div id="status"></div>
     </div>
 
@@ -305,6 +368,89 @@
             "טניס", "שחייה", "ריצה", "קפיצה", "שער", "קבוצה", "מאמן", "שופט", "בוקר", "צהריים",
             "ערב", "לילה", "שבוע", "חודש", "שנה", "אתמול", "מחר", "עכשיו"
         ];
+
+        let cardBackGraphic = null;
+        let cardBackLoadId = 0;
+        let isLoadingCardBack = false;
+        let isGeneratingPDF = false;
+
+        function updateDownloadButton() {
+            document.getElementById('downloadPDF').disabled = isGeneratingPDF ||
+                (document.getElementById('includeCardBack').checked && isLoadingCardBack);
+        }
+
+        function updateBackOptions() {
+            const enabled = document.getElementById('includeCardBack').checked;
+            document.getElementById('cardBackControls').hidden = !enabled;
+            document.getElementById('cardBackPreviewSection').hidden = !enabled;
+            updateDownloadButton();
+            updateStats();
+            updatePreview();
+        }
+
+        function clearCardBack(resetInput = true) {
+            cardBackLoadId++;
+            cardBackGraphic = null;
+            isLoadingCardBack = false;
+            if (resetInput) document.getElementById('cardBackInput').value = '';
+            document.getElementById('cardBackStatus').innerText = '';
+            document.getElementById('removeCardBack').hidden = true;
+            updateDownloadButton();
+            updatePreview();
+        }
+
+        async function loadCardBack(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            clearCardBack(false);
+            const loadId = cardBackLoadId;
+            const status = document.getElementById('cardBackStatus');
+            const supportedType = ['image/png', 'image/jpeg', 'image/webp'].includes(file.type);
+            if (!supportedType && (file.type || !/\.(png|jpe?g|webp)$/i.test(file.name))) {
+                document.getElementById('cardBackInput').value = '';
+                status.innerText = 'בחר תמונה בפורמט PNG, JPG או WebP.';
+                return;
+            }
+
+            isLoadingCardBack = true;
+            updateDownloadButton();
+            status.innerText = 'טוען את התמונה...';
+            const imageUrl = URL.createObjectURL(file);
+
+            try {
+                const image = new Image();
+                image.src = imageUrl;
+                await image.decode();
+                if (loadId !== cardBackLoadId) return;
+
+                // Normalize browser-supported images to PNG for consistent PDF output.
+                const scale = Math.min(1, 1600 / Math.max(image.naturalWidth, image.naturalHeight));
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+                canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+                canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+                cardBackGraphic = {
+                    dataUrl: canvas.toDataURL('image/png'),
+                    width: canvas.width,
+                    height: canvas.height
+                };
+                status.innerText = file.name;
+                document.getElementById('removeCardBack').hidden = false;
+            } catch (error) {
+                if (loadId === cardBackLoadId) {
+                    document.getElementById('cardBackInput').value = '';
+                    status.innerText = 'לא ניתן לטעון את התמונה. בחר קובץ תמונה תקין.';
+                }
+            } finally {
+                URL.revokeObjectURL(imageUrl);
+                if (loadId === cardBackLoadId) {
+                    isLoadingCardBack = false;
+                    updateDownloadButton();
+                    updatePreview();
+                }
+            }
+        }
 
         function getUserWords() {
             const input = document.getElementById('wordInput').value;
@@ -344,7 +490,8 @@
             display.innerText = slider.value;
             const totalWords = parseInt(slider.value);
             const totalCards = Math.ceil(totalWords / 4);
-            const totalPages = Math.ceil(totalCards / 9);
+            const totalPages = Math.ceil(totalCards / 9) *
+                (document.getElementById('includeCardBack').checked ? 2 : 1);
             document.getElementById('finalWordCount').innerText = totalWords;
             document.getElementById('cardCount').innerText = totalCards;
             document.getElementById('pageCount').innerText = totalPages;
@@ -397,13 +544,35 @@
             // צבעי טקסט ומספר
             texts.forEach(t => t.style.color = textColor);
             numbers.forEach(n => n.style.color = numberColor);
+
+            const backCard = document.getElementById('cardBackPreview');
+            const backImage = document.getElementById('cardBackPreviewImage');
+            backCard.style.backgroundColor = bgColor;
+            backCard.style.borderColor = getContrastColor(bgColor);
+            backImage.hidden = !cardBackGraphic;
+            document.getElementById('cardBackPlaceholder').hidden = !!cardBackGraphic;
+            if (cardBackGraphic) {
+                backImage.src = cardBackGraphic.dataUrl;
+            } else {
+                backImage.removeAttribute('src');
+            }
         }
 
         async function generateRealPDF() {
+            if (isGeneratingPDF) return;
             let words = getFinalList();
             const statusDiv = document.getElementById('status');
             
             if (words.length === 0) { alert("אנא הכנס מילים או הזז את הסליידר."); return; }
+            const includeBack = document.getElementById('includeCardBack').checked;
+            const backGraphic = includeBack ? cardBackGraphic : null;
+            if (includeBack && (isLoadingCardBack || !backGraphic)) {
+                statusDiv.innerText = isLoadingCardBack ? 'התמונה עדיין נטענת.' : 'בחר תמונה לגב הכרטיסים לפני ההורדה.';
+                document.getElementById('cardBackInput').focus();
+                return;
+            }
+            isGeneratingPDF = true;
+            updateDownloadButton();
             statusDiv.innerText = "מכין את הקובץ...";
 
             const bgColor = document.getElementById('bgColor').value;
@@ -507,6 +676,36 @@
                             doc.text(revWord, textRightEdge - numWidth - spaceWidth, yText, { align: 'right' });
                         });
                     });
+
+                    if (backGraphic) {
+                        doc.addPage();
+                        doc.setFillColor(bgColor);
+                        doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
+                        pageCards.forEach((cardWords, cardIdx) => {
+                            // Mirror columns for portrait duplex printing with a long-edge flip.
+                            const colIdx = cardIdx % cols;
+                            const rowIdx = Math.floor(cardIdx / cols);
+                            const xPos = margin + (colIdx * cardWidth);
+                            const yPos = margin + (rowIdx * cardHeight);
+                            const pad = 5;
+                            const imageScale = Math.min(
+                                (cardWidth - pad * 2) / backGraphic.width,
+                                (cardHeight - pad * 2) / backGraphic.height
+                            );
+                            const imageWidth = backGraphic.width * imageScale;
+                            const imageHeight = backGraphic.height * imageScale;
+                            doc.addImage(backGraphic.dataUrl, 'PNG',
+                                xPos + (cardWidth - imageWidth) / 2,
+                                yPos + (cardHeight - imageHeight) / 2,
+                                imageWidth, imageHeight, 'card-back', 'FAST');
+
+                            doc.setDrawColor(cutMarkColor);
+                            doc.setLineWidth(0.2);
+                            doc.setLineDashPattern([3, 3], 0);
+                            doc.rect(xPos, yPos, cardWidth, cardHeight, 'S');
+                        });
+                    }
                 });
 
                 statusDiv.innerText = "ההורדה החלה!";
@@ -517,13 +716,15 @@
             } catch (e) {
                 console.error(e);
                 statusDiv.innerText = "שגיאה: " + e.message;
+            } finally {
+                isGeneratingPDF = false;
+                updateDownloadButton();
             }
         }
         
         // אתחול נתונים ותצוגה מקדימה בטעינת העמוד
         window.onload = () => {
-            updateStats();
-            updatePreview();
+            updateBackOptions();
         };
     </script>
 </body>
